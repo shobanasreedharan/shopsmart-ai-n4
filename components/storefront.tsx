@@ -189,6 +189,31 @@ export function Storefront({
     [products],
   )
 
+  const handleGeneratePlan = async () => {
+  if (!description.trim()) return
+
+  const res = await fetch("/api/generate-plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      description,
+      guestCount: col1Value,
+      budget: col2Value,
+      type: activeTab,
+    }),
+  })
+
+  if (!res.ok) {
+    console.error("Failed to generate plan")
+    return
+  }
+
+  const data = await res.json()
+
+  setPlan(data.plan)
+  setActiveSection(0)
+}
+
   /* ─────────────────────────────
      RENDER
   ───────────────────────────── */
@@ -214,7 +239,7 @@ export function Storefront({
         </div>
 
         <button
-          onClick={() => setChatOpen(true)}
+          onClick={handleGeneratePlan}
           className="border border-[#555] text-[#6dcfa0] px-4 py-1.5 rounded-md text-xs"
         >
           <Bot className="inline size-3 mr-1" />
