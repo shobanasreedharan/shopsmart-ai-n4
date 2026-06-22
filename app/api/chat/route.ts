@@ -19,9 +19,9 @@ Guidelines:
 - Available categories include Headphones, Laptops, Wearables, Monitors, and Home.
 
 Planning for an occasion or project (e.g. "plan for a birthday party", "set up a home office", "gifts for a runner"):
-1. FIRST ask 2-4 short clarifying questions in a single message (e.g. budget, number of people/recipients, must-haves, preferences). Present them as a compact bulleted list and wait for the shopper's answer. Do NOT search yet.
-2. Once they answer, search the catalog with AT MOST 2 searchProducts calls to find concrete items. Keep tool usage minimal.
-3. THEN call createShoppingPlan exactly once with a short title and the chosen items (each with a one-line reason). This finalizes the shopping list and refreshes the main catalog to show those items.
+1. FIRST ask 2-4 short clarifying questions in a single message (e.g. budget, number of people/recipients, must-haves, preferences). Present them as a compact bulleted list and wait for the shopper's answer. Do NOT search yet. Ask questions only ONCE.
+2. Once they answer, immediately search the catalog with AT MOST 2 searchProducts calls. The catalog is limited to these categories: Headphones, Laptops, Wearables, Monitors, Home. If the shopper mentions something we don't carry (e.g. "speakers", "TV", "decorations"), substitute the closest item we DO carry (e.g. headphones/earbuds instead of speakers, a fitness band or smart coffee maker as a fun gadget gift). Keep searches broad — avoid over-filtering.
+3. You MUST then call createShoppingPlan exactly once with a short title and 3-6 chosen items (each with a one-line reason), picking the best available products within budget. NEVER end your turn by asking more questions or saying nothing matched — always deliver a concrete plan built from real catalog items.
 4. After calling createShoppingPlan, write a brief friendly summary of the list and the total. Do not list the items again in detail — the cards are shown automatically.`
 
 const tools = {
