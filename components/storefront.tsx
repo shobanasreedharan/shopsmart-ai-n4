@@ -13,12 +13,19 @@ export function Storefront({ products, preview = false }: { products: Product[];
   const [chatOpen, setChatOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string>("All")
   const [plan, setPlan] = useState<ShoppingPlan | null>(null)
+  const [activeSection, setActiveSection] = useState(0)
 
   function handlePlanReady(nextPlan: ShoppingPlan) {
     setPlan(nextPlan)
-    setActiveCategory("All")
+    setActiveSection(0)
     // Reveal the refreshed catalog behind the chat panel.
     setChatOpen(false)
+  }
+
+  function clearPlan() {
+    setPlan(null)
+    setActiveSection(0)
+    setActiveCategory("All")
   }
 
   const categories = useMemo(() => {
@@ -26,10 +33,15 @@ export function Storefront({ products, preview = false }: { products: Product[];
     return ["All", ...set]
   }, [products])
 
+  const planTotal = useMemo(
+    () => (plan ? plan.sections.reduce((n, s) => n + s.products.length, 0) : 0),
+    [plan],
+  )
+
   const displayProducts = useMemo(() => {
-    if (plan) return plan.products
+    if (plan) return plan.sections[activeSection]?.products ?? []
     return activeCategory === "All" ? products : products.filter((p) => p.category === activeCategory)
-  }, [plan, products, activeCategory])
+  }, [plan, activeSection, products, activeCategory])
 
   const deals = useMemo(
     () => products.filter((p) => p.originalPrice && p.originalPrice > p.price).length,
@@ -83,7 +95,7 @@ export function Storefront({ products, preview = false }: { products: Product[];
 
         <section aria-labelledby="catalog-heading">
           {plan ? (
-            <div className="flex flex-col gap-3 border-b border-border pb-4">
+            <div className="flex flex-col gap-4 border-b border-border pb-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -94,7 +106,8 @@ export function Storefront({ products, preview = false }: { products: Product[];
                       {plan.title}
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                      {plan.products.length} item{plan.products.length === 1 ? "" : "s"} curated by ShopSmart AI
+                      {plan.sections.length} list{plan.sections.length === 1 ? "" : "s"} · {planTotal} item
+                      {planTotal === 1 ? "" : "s"} planned by ShopSmart AI
                     </p>
                   </div>
                 </div>
@@ -103,11 +116,35 @@ export function Storefront({ products, preview = false }: { products: Product[];
                     <Sparkles className="size-4" aria-hidden="true" />
                     Refine plan
                   </Button>
-                  <Button onClick={() => setPlan(null)} size="sm" variant="ghost">
+                  <Button onClick={clearPlan} size="sm" variant="ghost">
                     <X className="size-4" aria-hidden="true" />
                     Clear
                   </Button>
                 </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {plan.sections.map((section, i) => (
+                  <button
+                    key={section.title}
+                    onClick={() => setActiveSection(i)}
+                    className={cn(
+                      "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                      activeSection === i
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-foreground hover:border-primary/50",
+                    )}
+                  >
+                    {section.title}
+                    <span
+                      className={cn(
+                        "ml-1.5 text-xs",
+                        activeSection === i ? "text-primary-foreground/80" : "text-muted-foreground",
+                      )}
+                    >
+                      {section.products.length}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
@@ -138,7 +175,7 @@ export function Storefront({ products, preview = false }: { products: Product[];
             {displayProducts.length ? (
               <ProductGrid className="lg:grid-cols-4" products={displayProducts} />
             ) : (
-              <p className="py-12 text-center text-muted-foreground">No products in this category yet.</p>
+              <p className="py-12 text-center text-muted-foreground">No products in this list yet.</p>
             )}
           </div>
         </section>

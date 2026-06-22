@@ -12,37 +12,38 @@ import {
 } from "@/components/ai-elements/conversation"
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
-import { ProductGrid } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import type { Product } from "@/lib/types"
 
-const PRODUCT_TOOLS = new Set([
+// Tools whose results power the catalog (never rendered as cards in chat).
+const SEARCH_TOOLS = new Set([
   "tool-searchProducts",
   "tool-getProductsByCategory",
   "tool-compareProducts",
 ])
 
-export type ShoppingPlan = { title: string; products: Product[] }
+export type PlanSection = { title: string; products: Product[] }
+export type ShoppingPlan = { title: string; sections: PlanSection[] }
 
-type PlanOutput = { title?: string; products?: Product[] }
+type PlanOutput = { title?: string; sections?: PlanSection[] }
 
 function extractPlan(message: { parts?: { type: string }[] }): ShoppingPlan | null {
   const part = message.parts?.find(
-    (p) => p.type === "tool-createShoppingPlan" && (p as { state?: string }).state === "output-available",
+    (p) => p.type === "tool-buildPlanCatalog" && (p as { state?: string }).state === "output-available",
   ) as { output?: PlanOutput } | undefined
   const output = part?.output
-  if (output?.products?.length) {
-    return { title: output.title ?? "Your shopping plan", products: output.products }
+  if (output?.sections?.length) {
+    return { title: output.title ?? "Your plan", sections: output.sections }
   }
   return null
 }
 
 const SUGGESTIONS = [
-  "Plan for a birthday party",
-  "Best noise-cancelling headphones under $300",
-  "Set up a home office on a budget",
-  "A budget fitness tracker for running",
+  "Plan a kids birthday party",
+  "Set up a home office",
+  "Gift ideas for a runner",
+  "Plan a movie night at home",
 ]
 
 export function ChatAssistant({ onPlanReady }: { onPlanReady?: (plan: ShoppingPlan) => void }) {
@@ -83,21 +84,22 @@ export function ChatAssistant({ onPlanReady }: { onPlanReady?: (plan: ShoppingPl
                     if (part.type === "text") {
                       return <MessageResponse key={i}>{part.text}</MessageResponse>
                     }
-                    if (part.type === "tool-createShoppingPlan") {
+                    if (part.type === "tool-buildPlanCatalog") {
                       const planPart = part as { state?: string; output?: PlanOutput }
                       if (planPart.state === "output-available") {
-                        const products = planPart.output?.products ?? []
-                        if (!products.length) return null
+                        const sections = planPart.output?.sections ?? []
+                        if (!sections.length) return null
+                        const total = sections.reduce((n, s) => n + s.products.length, 0)
                         return (
-                          <div className="my-1 rounded-lg border border-primary/30 bg-primary/5 p-3" key={i}>
-                            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                              <ListChecks className="size-4 text-primary" aria-hidden="true" />
-                              {planPart.output?.title ?? "Your shopping plan"}
-                            </div>
-                            <ProductGrid products={products} />
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              Added to your catalog below — close this panel to browse the full plan.
-                            </p>
+                          <div
+                            className="my-1 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm font-medium"
+                            key={i}
+                          >
+                            <ListChecks className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                            <span>
+                              Catalog updated: {sections.length} section{sections.length === 1 ? "" : "s"},{" "}
+                              {total} item{total === 1 ? "" : "s"}. Close this panel to browse.
+                            </span>
                           </div>
                         )
                       }
@@ -105,24 +107,21 @@ export function ChatAssistant({ onPlanReady }: { onPlanReady?: (plan: ShoppingPl
                         return (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground" key={i}>
                             <Spinner className="size-4" />
-                            Building your shopping plan...
+                            Building your catalog...
                           </div>
                         )
                       }
                       return null
                     }
-                    if (PRODUCT_TOOLS.has(part.type)) {
-                      const toolPart = part as { state?: string; output?: { products?: Product[] } }
-                      if (toolPart.state === "output-available") {
-                        const products = toolPart.output?.products ?? []
-                        if (!products.length) return null
-                        return <ProductGrid className="my-1" key={i} products={products} />
-                      }
+                    // Search tools power the catalog, not the chat — show a quiet
+                    // progress hint while the assistant looks things up.
+                    if (SEARCH_TOOLS.has(part.type)) {
+                      const toolPart = part as { state?: string }
                       if (toolPart.state === "input-available" || toolPart.state === "input-streaming") {
                         return (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground" key={i}>
                             <Spinner className="size-4" />
-                            Searching the catalog...
+                            Finding products...
                           </div>
                         )
                       }

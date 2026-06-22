@@ -1,34 +1,32 @@
 import { streamText, convertToModelMessages, tool, stepCountIs, type UIMessage } from "ai"
 import { z } from "zod"
 import { searchProducts, getProductsByCategory, getCategories, getProductById } from "@/lib/db"
+import type { Product } from "@/lib/types"
 
 export const maxDuration = 30
 
-const SYSTEM_PROMPT = `You are ShopSmart AI, a friendly and knowledgeable shopping assistant.
+const SYSTEM_PROMPT = `You are ShopSmart AI, a friendly shopping planner for a catalog of tech products.
+The catalog ONLY contains these categories: Headphones, Laptops, Wearables, Monitors, Home.
 
-Your job is to help shoppers find the right products, compare options, and spot good deals from the store catalog.
+IMPORTANT — Keep chat clean. NEVER recommend, list, name, or describe individual products in the chat. Never paste product names, specs, prices, or "options" into the conversation. All products are shown to the shopper in the main catalog on the page, never in chat. Your chat replies are short and conversational only.
 
-Guidelines:
-- ALWAYS use your tools to look up real products before recommending anything. Never invent products, prices, or specs.
-- When a shopper describes a need or budget, call searchProducts with appropriate filters.
-- When comparing items, fetch them and explain trade-offs clearly (price, features, ratings).
-- Point out deals when a product has an originalPrice higher than its current price.
-- Keep replies concise and conversational. Use short paragraphs or compact bullet points.
-- After recommending, the product cards are shown to the user automatically from your tool results, so do NOT repeat full specs in prose — summarize why each pick fits.
-- If nothing matches, say so honestly and suggest adjusting the budget or criteria.
-- Available categories include Headphones, Laptops, Wearables, Monitors, and Home.
+Help the shopper plan for an occasion or project (e.g. "kids birthday party", "home office setup", "gifts for a runner"). Follow this STRICT three-step flow:
 
-Planning for an occasion or project (e.g. "plan for a birthday party", "set up a home office", "gifts for a runner"):
-This is a STRICT two-turn flow. Count the user's messages in the conversation.
+STEP 1 — The user's first message describes the occasion. Ask 2-4 SHORT clarifying questions in ONE message as a compact bulleted list (e.g. age group, number of guests, indoor or outdoor, budget, theme/interests). Do NOT call any tools.
 
-TURN 1 — The user's FIRST message is the planning request. Respond with EXACTLY 2-4 short clarifying questions in a single message (e.g. budget, number of people/recipients, must-haves, preferences) as a compact bulleted list. Do NOT call any tools yet.
+STEP 2 — The user answers your questions. Reply with a SHORT numbered list of the TYPES of items needed for the occasion. These are section/category names, NOT specific products. Example:
+"Here's what I'd plan for a kids party:
+1. Party music & audio
+2. A standout gift
+3. Smart home extras"
+Keep it to 3-5 items. Then ask the user to confirm, e.g. "Want me to build this into your catalog? Reply 'ok' to continue." Do NOT call any tools. Do NOT name specific products.
 
-TURN 2 — The user's SECOND message answers your questions. You MUST now build the plan in this same turn. It is FORBIDDEN to ask any further questions — even if some details are missing, make reasonable assumptions and proceed. Steps:
-  a. Search the catalog with AT MOST 2 searchProducts calls. The catalog only has these categories: Headphones, Laptops, Wearables, Monitors, Home. If the shopper mentions something we don't carry (e.g. "speakers", "TV", "decorations"), substitute the closest item we DO carry (e.g. headphones/earbuds instead of speakers; a fitness band, smartwatch, or smart coffee maker as a fun gadget gift). Keep searches broad — avoid over-filtering.
-  b. Call createShoppingPlan EXACTLY ONCE with a short title and 3-6 chosen items (each with a one-line reason), picking the best available products within budget.
-  c. Then write a brief friendly summary of the list and the total. Do not re-list specs — the cards are shown automatically.
+STEP 3 — The user confirms (e.g. "ok", "yes", "go ahead"). Now build it:
+  a. Use searchProducts (at most 3 calls) to find REAL catalog products for each section. Substitute the closest items we carry for things we don't sell (e.g. earbuds/headphones for "music", a smartwatch or fitness band as a gift, a smart coffee maker or other Home items for ambiance/extras).
+  b. Call buildPlanCatalog EXACTLY ONCE. Provide the occasion title and 3-5 sections; each section has a short title (matching your step-2 list) and 1-4 real products (by category + productId). Skip any section you cannot fill with real catalog products.
+  c. After the tool call, reply with ONE short sentence confirming the catalog is ready (e.g. "Done — your Kids Birthday Party catalog is ready below."). Do NOT list products.
 
-NEVER ask a second round of questions. NEVER end a turn after the user has answered without calling createShoppingPlan.`
+Never show products in chat. Never skip the step-2 list or the confirmation. Once confirmed, you MUST call buildPlanCatalog.`
 
 const tools = {
   searchProducts: tool({
@@ -88,38 +86,39 @@ const tools = {
       return { categories }
     },
   }),
-  createShoppingPlan: tool({
+  buildPlanCatalog: tool({
     description:
-      "Finalize a curated shopping list/plan after you have gathered the shopper's requirements. Call this once you know what to recommend for their occasion or project. The selected products are shown to the shopper and the main store catalog refreshes to display exactly this list.",
+      "Build the shopper's plan into the main catalog after they confirm. The plan is grouped into sections — each section becomes a category tab on the page that lists its products. Call this EXACTLY ONCE, only after the shopper confirms the plan.",
     inputSchema: z.object({
-      title: z.string().describe("Short title for the plan, e.g. 'Birthday Party Tech Kit'"),
-      items: z
+      title: z.string().describe("The occasion title, e.g. 'Kids Birthday Party'"),
+      sections: z
         .array(
           z.object({
-            category: z.string().describe("The product's category (partition key)"),
-            productId: z.string().describe("The product's id (sort key)"),
-            reason: z.string().describe("One short line on why this item is recommended"),
+            title: z.string().describe("Short section/tab title, e.g. 'Party Music' or 'Gift Ideas'"),
+            items: z
+              .array(
+                z.object({
+                  category: z.string().describe("The product's category (partition key)"),
+                  productId: z.string().describe("The product's id (sort key)"),
+                }),
+              )
+              .describe("1-4 real catalog products for this section"),
           }),
         )
-        .describe("The chosen products that make up the plan"),
+        .describe("3-5 sections that make up the plan"),
     }),
-    execute: async ({ title, items }) => {
+    execute: async ({ title, sections }) => {
       const resolved = await Promise.all(
-        items.map(async ({ category, productId, reason }) => {
-          const product = await getProductById(category, productId)
-          return product ? { product, reason } : null
+        sections.map(async (section) => {
+          const products = (
+            await Promise.all(section.items.map(({ category, productId }) => getProductById(category, productId)))
+          ).filter((p): p is Product => Boolean(p))
+          return { title: section.title, products }
         }),
       )
-      const picks = resolved.filter((x): x is { product: NonNullable<typeof x>["product"]; reason: string } => Boolean(x))
-      const products = picks.map((p) => p.product)
-      const total = products.reduce((sum, p) => sum + p.price, 0)
-      return {
-        title,
-        count: products.length,
-        total: Math.round(total * 100) / 100,
-        products,
-        items: picks.map((p) => ({ productId: p.product.productId, reason: p.reason })),
-      }
+      const filled = resolved.filter((s) => s.products.length > 0)
+      const count = filled.reduce((n, s) => n + s.products.length, 0)
+      return { title, sections: filled, count }
     },
   }),
 }
