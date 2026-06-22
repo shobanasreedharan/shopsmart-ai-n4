@@ -81,15 +81,15 @@ export function Storefront({ products, preview = false }: { products: Product[];
             {deals} live deals today
           </Badge>
           <h1 className="text-balance text-3xl font-bold leading-tight tracking-tight md:text-5xl">
-            Shop smarter with an AI that actually knows the catalog
+            Plan your whole event with an AI that builds the shopping list
           </h1>
           <p className="max-w-2xl text-pretty leading-relaxed text-muted-foreground md:text-lg">
-            Describe what you need and your budget. ShopSmart AI searches real products, compares options,
-            and surfaces the best deals — no endless scrolling required.
+            Tell ShopSmart AI about your party, BBQ, or movie night. It asks a few quick questions, then
+            fills your catalog with decorations, food supplies, favors, games, and more — ready to shop.
           </p>
           <Button onClick={() => setChatOpen(true)} size="lg" className="mt-2">
             <Search className="size-4" aria-hidden="true" />
-            Find my perfect product
+            Plan my event
           </Button>
         </section>
 

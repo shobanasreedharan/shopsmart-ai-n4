@@ -41,9 +41,9 @@ function extractPlan(message: { parts?: { type: string }[] }): ShoppingPlan | nu
 
 const SUGGESTIONS = [
   "Plan a kids birthday party",
-  "Set up a home office",
-  "Gift ideas for a runner",
-  "Plan a movie night at home",
+  "Backyard BBQ this weekend",
+  "Cozy movie night at home",
+  "A baby shower for 20 guests",
 ]
 
 export function ChatAssistant({ onPlanReady }: { onPlanReady?: (plan: ShoppingPlan) => void }) {
