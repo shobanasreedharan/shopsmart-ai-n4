@@ -1,8 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Sparkles, X, Search, TrendingUp, Database } from "lucide-react"
-import { ChatAssistant } from "@/components/chat-assistant"
+import { Sparkles, X, Search, TrendingUp, Database, ListChecks } from "lucide-react"
+import { ChatAssistant, type ShoppingPlan } from "@/components/chat-assistant"
 import { ProductGrid } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,16 +12,24 @@ import type { Product } from "@/lib/types"
 export function Storefront({ products, preview = false }: { products: Product[]; preview?: boolean }) {
   const [chatOpen, setChatOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string>("All")
+  const [plan, setPlan] = useState<ShoppingPlan | null>(null)
+
+  function handlePlanReady(nextPlan: ShoppingPlan) {
+    setPlan(nextPlan)
+    setActiveCategory("All")
+    // Reveal the refreshed catalog behind the chat panel.
+    setChatOpen(false)
+  }
 
   const categories = useMemo(() => {
     const set = Array.from(new Set(products.map((p) => p.category))).sort()
     return ["All", ...set]
   }, [products])
 
-  const visible = useMemo(
-    () => (activeCategory === "All" ? products : products.filter((p) => p.category === activeCategory)),
-    [products, activeCategory],
-  )
+  const displayProducts = useMemo(() => {
+    if (plan) return plan.products
+    return activeCategory === "All" ? products : products.filter((p) => p.category === activeCategory)
+  }, [plan, products, activeCategory])
 
   const deals = useMemo(
     () => products.filter((p) => p.originalPrice && p.originalPrice > p.price).length,
@@ -74,31 +82,61 @@ export function Storefront({ products, preview = false }: { products: Product[];
         </section>
 
         <section aria-labelledby="catalog-heading">
-          <div className="flex flex-col gap-4 border-b border-border pb-4">
-            <h2 id="catalog-heading" className="text-xl font-semibold">
-              Browse the catalog
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={cn(
-                    "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-                    activeCategory === category
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card text-foreground hover:border-primary/50",
-                  )}
-                >
-                  {category}
-                </button>
-              ))}
+          {plan ? (
+            <div className="flex flex-col gap-3 border-b border-border pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ListChecks className="size-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h2 id="catalog-heading" className="text-xl font-semibold leading-tight">
+                      {plan.title}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {plan.products.length} item{plan.products.length === 1 ? "" : "s"} curated by ShopSmart AI
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={() => setChatOpen(true)} size="sm" variant="outline">
+                    <Sparkles className="size-4" aria-hidden="true" />
+                    Refine plan
+                  </Button>
+                  <Button onClick={() => setPlan(null)} size="sm" variant="ghost">
+                    <X className="size-4" aria-hidden="true" />
+                    Clear
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-4 border-b border-border pb-4">
+              <h2 id="catalog-heading" className="text-xl font-semibold">
+                Browse the catalog
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setActiveCategory(category)}
+                    className={cn(
+                      "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                      activeCategory === category
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-foreground hover:border-primary/50",
+                    )}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="pt-6">
-            {visible.length ? (
-              <ProductGrid className="lg:grid-cols-4" products={visible} />
+            {displayProducts.length ? (
+              <ProductGrid className="lg:grid-cols-4" products={displayProducts} />
             ) : (
               <p className="py-12 text-center text-muted-foreground">No products in this category yet.</p>
             )}
@@ -134,7 +172,7 @@ export function Storefront({ products, preview = false }: { products: Product[];
           </Button>
         </div>
         <div className="min-h-0 flex-1">
-          <ChatAssistant />
+          <ChatAssistant onPlanReady={handlePlanReady} />
         </div>
       </aside>
     </div>
