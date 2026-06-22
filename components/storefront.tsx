@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Sparkles, X, Search, TrendingUp } from "lucide-react"
+import { Sparkles, X, Search, TrendingUp, Database } from "lucide-react"
 import { ChatAssistant } from "@/components/chat-assistant"
 import { ProductGrid } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { Product } from "@/lib/types"
 
-export function Storefront({ products }: { products: Product[] }) {
+export function Storefront({ products, preview = false }: { products: Product[]; preview?: boolean }) {
   const [chatOpen, setChatOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string>("All")
 
@@ -30,6 +30,15 @@ export function Storefront({ products }: { products: Product[] }) {
 
   return (
     <div className="min-h-screen bg-background">
+      {preview && (
+        <div className="flex items-center justify-center gap-2 bg-primary/10 px-4 py-2 text-center text-xs text-foreground">
+          <Database className="size-3.5 text-primary" aria-hidden="true" />
+          <span>
+            Preview catalog. Connect &amp; seed DynamoDB (POST{" "}
+            <code className="rounded bg-muted px-1 py-0.5">/api/seed</code>) for the live catalog.
+          </span>
+        </div>
+      )}
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-2">
