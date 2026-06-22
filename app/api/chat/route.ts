@@ -1,22 +1,34 @@
 import { streamText, convertToModelMessages, tool, stepCountIs, type UIMessage } from "ai"
 import { z } from "zod"
 import { searchProducts, getProductsByCategory, getCategories, getProductById } from "@/lib/db"
+import type { Product } from "@/lib/types"
 
 export const maxDuration = 30
 
-const SYSTEM_PROMPT = `You are ShopSmart AI, a friendly and knowledgeable shopping assistant.
+const SYSTEM_PROMPT = `You are ShopSmart AI, a friendly event-planning shopping assistant.
+You help people plan events (birthday parties, BBQs, movie nights, baby showers, and other gatherings) by building a shopping list from a catalog of party supplies.
+The catalog ONLY contains these categories: Decorations, Food & Supplies, Party Favors, Games & Activities, Movie Night.
 
-Your job is to help shoppers find the right products, compare options, and spot good deals from the store catalog.
+IMPORTANT — Keep chat clean. NEVER recommend, list, name, or describe individual products in the chat. Never paste product names, specs, prices, or "options" into the conversation. All products are shown to the user in the main catalog on the page, never in chat. Your chat replies are short and conversational only.
 
-Guidelines:
-- ALWAYS use your tools to look up real products before recommending anything. Never invent products, prices, or specs.
-- When a shopper describes a need or budget, call searchProducts with appropriate filters.
-- When comparing items, fetch them and explain trade-offs clearly (price, features, ratings).
-- Point out deals when a product has an originalPrice higher than its current price.
-- Keep replies concise and conversational. Use short paragraphs or compact bullet points.
-- After recommending, the product cards are shown to the user automatically from your tool results, so do NOT repeat full specs in prose — summarize why each pick fits.
-- If nothing matches, say so honestly and suggest adjusting the budget or criteria.
-- Available categories include Headphones, Laptops, Wearables, Monitors, and Home.`
+Follow this STRICT three-step flow:
+
+STEP 1 — The user's first message describes the event. Ask 2-4 SHORT clarifying questions in ONE message as a compact bulleted list (e.g. event type, number of guests, kids or adults, indoor or outdoor, theme, budget). Do NOT call any tools.
+
+STEP 2 — The user answers your questions. Reply with a SHORT numbered list of the TYPES of supplies needed for the event. These are section names, NOT specific products. Example:
+"Here's what I'd plan for a kids birthday party:
+1. Decorations
+2. Food & table supplies
+3. Party favors
+4. Games & activities"
+Keep it to 3-5 items. Then ask the user to confirm, e.g. "Want me to build this into your catalog? Reply 'ok' to continue." Do NOT call any tools. Do NOT name specific products.
+
+STEP 3 — The user confirms (e.g. "ok", "yes", "go ahead"). Now build it:
+  a. Use searchProducts (at most 3 calls) to find REAL catalog products for each section. Map sections to real categories: decorations -> Decorations; food/table/tableware -> Food & Supplies; favors/goodie bags -> Party Favors; games/activities -> Games & Activities; movie/snacks/cozy -> Movie Night.
+  b. Call buildPlanCatalog EXACTLY ONCE. Provide the event title and 3-5 sections; each section has a short title (matching your step-2 list) and 1-4 real products (by category + productId). Skip any section you cannot fill with real catalog products.
+  c. After the tool call, reply with ONE short sentence confirming the catalog is ready (e.g. "Done — your Kids Birthday Party catalog is ready below."). Do NOT list products.
+
+Never show products in chat. Never skip the step-2 list or the confirmation. Once confirmed, you MUST call buildPlanCatalog.`
 
 const tools = {
   searchProducts: tool({
@@ -27,7 +39,7 @@ const tools = {
       category: z
         .string()
         .nullable()
-        .describe("One of: Headphones, Laptops, Wearables, Monitors, Home"),
+        .describe("One of: Decorations, Food & Supplies, Party Favors, Games & Activities, Movie Night"),
       maxPrice: z.number().nullable().describe("Maximum price in USD"),
       minRating: z.number().nullable().describe("Minimum average rating, 0-5"),
       tags: z.array(z.string()).nullable().describe("Tags to match, e.g. budget, premium, gaming, travel"),
@@ -76,18 +88,61 @@ const tools = {
       return { categories }
     },
   }),
+  buildPlanCatalog: tool({
+    description:
+      "Build the shopper's plan into the main catalog after they confirm. The plan is grouped into sections — each section becomes a category tab on the page that lists its products. Call this EXACTLY ONCE, only after the shopper confirms the plan.",
+    inputSchema: z.object({
+      title: z.string().describe("The occasion title, e.g. 'Kids Birthday Party'"),
+      sections: z
+        .array(
+          z.object({
+            title: z.string().describe("Short section/tab title, e.g. 'Party Music' or 'Gift Ideas'"),
+            items: z
+              .array(
+                z.object({
+                  category: z.string().describe("The product's category (partition key)"),
+                  productId: z.string().describe("The product's id (sort key)"),
+                }),
+              )
+              .describe("1-4 real catalog products for this section"),
+          }),
+        )
+        .describe("3-5 sections that make up the plan"),
+    }),
+    execute: async ({ title, sections }) => {
+      const resolved = await Promise.all(
+        sections.map(async (section) => {
+          const products = (
+            await Promise.all(section.items.map(({ category, productId }) => getProductById(category, productId)))
+          ).filter((p): p is Product => Boolean(p))
+          return { title: section.title, products }
+        }),
+      )
+      const filled = resolved.filter((s) => s.products.length > 0)
+      const count = filled.reduce((n, s) => n + s.products.length, 0)
+      return { title, sections: filled, count }
+    },
+  }),
 }
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json()
 
   const result = streamText({
-    model: "openai/gpt-5-mini",
+    model: "openai/gpt-4o-mini",
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     tools,
-    stopWhen: stepCountIs(6),
+    stopWhen: stepCountIs(10),
   })
 
-  return result.toUIMessageStreamResponse()
+  return result.toUIMessageStreamResponse({
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error)
+      if (/rate.?limit|429|free tier/i.test(message)) {
+        return "RATE_LIMIT: The AI model is rate-limited on the free tier. Add AI Gateway credits and retry."
+      }
+      return "Something went wrong while generating a response. Please try again."
+    },
+  })
 }

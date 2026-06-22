@@ -8,11 +8,23 @@ import {
 } from "@aws-sdk/lib-dynamodb"
 import { awsCredentialsProvider } from "@vercel/functions/oidc"
 import type { Product } from "./types"
+import { SEED_PRODUCTS } from "./seed-data"
 
 export const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME
-// Composite key: partition key "category" (String), sort key "productId" (String)
-const PARTITION_KEY = "category"
-const SORT_KEY = "productId"
+// Key names come from the integration-provided env vars so they always match the
+// actual table schema. Fall back to the catalog's natural composite key.
+const PARTITION_KEY = process.env.DYNAMODB_TABLE_PARTITION_KEY || "category"
+const SORT_KEY = process.env.DYNAMODB_TABLE_SORT_KEY || "productId"
+
+/**
+ * Whether the DynamoDB integration is wired up in this environment. The
+ * integration's credentials are sensitive and only present in deployed
+ * (preview/production) environments — never in the local/sandbox dev runtime —
+ * so when they're absent we transparently serve the starter catalog instead.
+ */
+export function isDatabaseConfigured(): boolean {
+  return Boolean(process.env.AWS_REGION && process.env.AWS_ROLE_ARN && process.env.DYNAMODB_TABLE_NAME)
+}
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
@@ -28,12 +40,14 @@ const docClient = DynamoDBDocumentClient.from(client, {
 
 /** Fetch every product in the catalog. */
 export async function getAllProducts(): Promise<Product[]> {
+  if (!isDatabaseConfigured()) return SEED_PRODUCTS
   const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }))
   return (result.Items || []) as Product[]
 }
 
 /** Fetch all products within a single category (efficient partition query). */
 export async function getProductsByCategory(category: string): Promise<Product[]> {
+  if (!isDatabaseConfigured()) return SEED_PRODUCTS.filter((p) => p.category === category)
   const result = await docClient.send(
     new QueryCommand({
       TableName: TABLE_NAME,
@@ -47,6 +61,8 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 
 /** Fetch a single product by its category + productId composite key. */
 export async function getProductById(category: string, productId: string): Promise<Product | null> {
+  if (!isDatabaseConfigured())
+    return SEED_PRODUCTS.find((p) => p.category === category && p.productId === productId) ?? null
   const result = await docClient.send(
     new GetCommand({
       TableName: TABLE_NAME,
@@ -110,9 +126,19 @@ export async function getCategories(): Promise<string[]> {
 
 /** Seed the table with the starter catalog. Idempotent via Put. */
 export async function seedProducts(products: Product[]): Promise<number> {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DynamoDB is not configured in this environment. Deploy or connect the database to seed.")
+  }
   let count = 0
   for (const product of products) {
-    await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: product }))
+    // Ensure the table's key attributes are populated regardless of their
+    // configured names (partition key holds the category, sort key the productId).
+    const item: Record<string, unknown> = {
+      ...product,
+      [PARTITION_KEY]: product.category,
+      [SORT_KEY]: product.productId,
+    }
+    await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: item }))
     count++
   }
   return count
