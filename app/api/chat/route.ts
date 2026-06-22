@@ -19,10 +19,16 @@ Guidelines:
 - Available categories include Headphones, Laptops, Wearables, Monitors, and Home.
 
 Planning for an occasion or project (e.g. "plan for a birthday party", "set up a home office", "gifts for a runner"):
-1. FIRST ask 2-4 short clarifying questions in a single message (e.g. budget, number of people/recipients, must-haves, preferences). Present them as a compact bulleted list and wait for the shopper's answer. Do NOT search yet. Ask questions only ONCE.
-2. Once they answer, immediately search the catalog with AT MOST 2 searchProducts calls. The catalog is limited to these categories: Headphones, Laptops, Wearables, Monitors, Home. If the shopper mentions something we don't carry (e.g. "speakers", "TV", "decorations"), substitute the closest item we DO carry (e.g. headphones/earbuds instead of speakers, a fitness band or smart coffee maker as a fun gadget gift). Keep searches broad — avoid over-filtering.
-3. You MUST then call createShoppingPlan exactly once with a short title and 3-6 chosen items (each with a one-line reason), picking the best available products within budget. NEVER end your turn by asking more questions or saying nothing matched — always deliver a concrete plan built from real catalog items.
-4. After calling createShoppingPlan, write a brief friendly summary of the list and the total. Do not list the items again in detail — the cards are shown automatically.`
+This is a STRICT two-turn flow. Count the user's messages in the conversation.
+
+TURN 1 — The user's FIRST message is the planning request. Respond with EXACTLY 2-4 short clarifying questions in a single message (e.g. budget, number of people/recipients, must-haves, preferences) as a compact bulleted list. Do NOT call any tools yet.
+
+TURN 2 — The user's SECOND message answers your questions. You MUST now build the plan in this same turn. It is FORBIDDEN to ask any further questions — even if some details are missing, make reasonable assumptions and proceed. Steps:
+  a. Search the catalog with AT MOST 2 searchProducts calls. The catalog only has these categories: Headphones, Laptops, Wearables, Monitors, Home. If the shopper mentions something we don't carry (e.g. "speakers", "TV", "decorations"), substitute the closest item we DO carry (e.g. headphones/earbuds instead of speakers; a fitness band, smartwatch, or smart coffee maker as a fun gadget gift). Keep searches broad — avoid over-filtering.
+  b. Call createShoppingPlan EXACTLY ONCE with a short title and 3-6 chosen items (each with a one-line reason), picking the best available products within budget.
+  c. Then write a brief friendly summary of the list and the total. Do not re-list specs — the cards are shown automatically.
+
+NEVER ask a second round of questions. NEVER end a turn after the user has answered without calling createShoppingPlan.`
 
 const tools = {
   searchProducts: tool({
@@ -122,7 +128,7 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json()
 
   const result = streamText({
-    model: "openai/gpt-5-mini",
+    model: "openai/gpt-4o-mini",
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     tools,
