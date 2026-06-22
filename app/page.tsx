@@ -6,10 +6,6 @@ import type { Product } from "@/lib/types"
 export const dynamic = "force-dynamic"
 
 export default async function HomePage() {
-  // When the DynamoDB integration is wired up (deployed environments), serve the
-  // live catalog. Otherwise (local/sandbox preview, where the integration's
-  // sensitive credentials aren't injected) fall back to the starter catalog so
-  // the storefront and AI assistant stay fully browsable.
   const dbConfigured = isDatabaseConfigured()
 
   let products: Product[] = SEED_PRODUCTS
@@ -21,7 +17,7 @@ export default async function HomePage() {
       if (live.length > 0) {
         products = live
       } else {
-        preview = true // connected but not seeded yet
+        preview = true
       }
     } catch {
       preview = true
