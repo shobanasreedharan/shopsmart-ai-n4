@@ -2,23 +2,45 @@
 
 import { useMemo, useState, useEffect } from "react"
 import {
-  X,
-  Database,
-  ListChecks,
-  ShoppingBag,
-  Bot,
-  PartyPopper,
-  Flame,
-  Tv,
-  Wrench,
+  X, Database, ListChecks, ShoppingBag, Bot,
+  PartyPopper, Flame, Tv, Wrench, Star, Loader2,
+  ExternalLink, ShoppingCart,
 } from "lucide-react"
 import { ChatAssistant, type ShoppingPlan } from "@/components/chat-assistant"
-import { ProductGrid } from "@/components/product-card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { Product } from "@/lib/types"
 
+/* ─────────────────────────────
+   TYPES
+───────────────────────────── */
+
 type TabId = "event-party" | "event-bbq" | "event-movie" | "diy"
+
+interface AmazonProduct {
+  asin: string
+  name: string
+  brand: string
+  price: number
+  originalPrice: number | null
+  rating: number
+  reviewCount: number
+  imageUrl: string
+  amazonUrl: string
+  inStock: boolean
+  badge: string | null
+}
+
+interface GeneratedSection {
+  title: string
+  products: AmazonProduct[]
+}
+
+interface GeneratedPlan {
+  title: string
+  type: string
+  sections: GeneratedSection[]
+}
 
 /* ─────────────────────────────
    TAB CONFIG
@@ -40,7 +62,7 @@ const TABS: {
   {
     id: "event-party",
     label: "Event Planning",
-    icon: <PartyPopper className="size-4" aria-hidden="true" />,
+    icon: <PartyPopper className="size-4" />,
     title: "Plan Your Event Supplies",
     sub: "AI builds your complete event shopping list",
     placeholder: "e.g. Kids birthday party for 20 guests",
@@ -52,7 +74,7 @@ const TABS: {
   {
     id: "event-bbq",
     label: "BBQ & Outdoor",
-    icon: <Flame className="size-4" aria-hidden="true" />,
+    icon: <Flame className="size-4" />,
     title: "Plan Your BBQ Supplies",
     sub: "AI picks everything for your outdoor cookout",
     placeholder: "e.g. Backyard BBQ for 15 people",
@@ -64,7 +86,7 @@ const TABS: {
   {
     id: "event-movie",
     label: "Movie Night",
-    icon: <Tv className="size-4" aria-hidden="true" />,
+    icon: <Tv className="size-4" />,
     title: "Plan Your Movie Night",
     sub: "AI curates snacks, decor and comfort items",
     placeholder: "e.g. Cozy movie night for 4 people",
@@ -76,7 +98,7 @@ const TABS: {
   {
     id: "diy",
     label: "DIY",
-    icon: <Wrench className="size-4" aria-hidden="true" />,
+    icon: <Wrench className="size-4" />,
     title: "DIY Project Supplies",
     sub: "AI finds the tools and parts you need",
     placeholder: "e.g. Fix washing machine, build a shelf, repaint walls",
@@ -87,21 +109,94 @@ const TABS: {
   },
 ]
 
-const EVENT_CATS = ["All", "Decorations", "Food & Supplies", "Games & Activities", "Movie Night", "Party Favors"]
-const DIY_CATS   = ["All", "Plumbing", "Electrical", "Painting", "Carpentry", "Appliances"]
+const EVENT_CHIPS = ["Kids birthday party 🎉", "Backyard BBQ this weekend", "Movie night for 4", "Baby shower for 20 guests"]
+const DIY_CHIPS   = ["Fix washing machine 🔧", "Build a bookshelf", "Repaint living room", "Install ceiling fan"]
 
-const EVENT_CHIPS = [
-  "Kids birthday party 🎉",
-  "Backyard BBQ this weekend",
-  "Movie night for 4",
-  "Baby shower for 20 guests",
-]
-const DIY_CHIPS = [
-  "Fix washing machine 🔧",
-  "Build a bookshelf",
-  "Repaint living room",
-  "Install ceiling fan",
-]
+/* ─────────────────────────────
+   STAR RATING
+───────────────────────────── */
+
+function StarRating({ rating, count }: { rating: number; count: number }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((s) => (
+          <Star
+            key={s}
+            className={cn(
+              "size-3",
+              s <= Math.round(rating)
+                ? "fill-[#f5a623] text-[#f5a623]"
+                : "fill-[#e0ddd5] text-[#e0ddd5]",
+            )}
+          />
+        ))}
+      </div>
+      <span className="text-[11px] text-[#888]">
+        {rating.toFixed(1)} ({count.toLocaleString()})
+      </span>
+    </div>
+  )
+}
+
+/* ─────────────────────────────
+   AMAZON PRODUCT CARD
+───────────────────────────── */
+
+function AmazonCard({ product }: { product: AmazonProduct }) {
+  const discount = product.originalPrice
+    ? Math.round((1 - product.price / product.originalPrice) * 100)
+    : null
+
+  return (
+    <div className="bg-white rounded-xl border border-[#e0ddd5] p-4 flex flex-col gap-3 hover:border-[#6dcfa0] hover:shadow-sm transition-all group">
+      {/* Image area */}
+      <div className="relative bg-[#f9f7f3] rounded-lg h-36 flex items-center justify-center overflow-hidden">
+        {product.badge && (
+          <span className="absolute top-2 left-2 bg-[#111] text-white text-[9px] font-medium px-2 py-0.5 rounded-full">
+            {product.badge}
+          </span>
+        )}
+        {discount && (
+          <span className="absolute top-2 right-2 bg-[#c0392b] text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+            -{discount}%
+          </span>
+        )}
+        {/* Placeholder illustration */}
+        <ShoppingCart className="size-10 text-[#ddd]" />
+      </div>
+
+      {/* Info */}
+      <div className="flex flex-col gap-1.5 flex-1">
+        <div className="text-[10px] text-[#aaa] uppercase tracking-wide">{product.brand}</div>
+        <div className="text-sm font-medium text-[#111] leading-snug line-clamp-2">{product.name}</div>
+        <StarRating rating={product.rating} count={product.reviewCount} />
+      </div>
+
+      {/* Price + CTA */}
+      <div className="flex items-center justify-between pt-1 border-t border-[#f0ede6]">
+        <div>
+          <span className="text-lg font-semibold text-[#111]">${product.price.toFixed(2)}</span>
+          {product.originalPrice && (
+            <span className="ml-1.5 text-xs text-[#bbb] line-through">${product.originalPrice.toFixed(2)}</span>
+          )}
+        </div>
+        <a
+          href={product.amazonUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-xs bg-[#f5a623] hover:bg-[#e09010] text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+        >
+          Amazon <ExternalLink className="size-3" />
+        </a>
+      </div>
+
+      {!product.inStock && (
+        <p className="text-[10px] text-red-400 font-medium -mt-1">Out of stock</p>
+      )}
+    </div>
+  )
+}
 
 /* ─────────────────────────────
    COMPONENT
@@ -117,24 +212,31 @@ export function Storefront({
   /* ── UI STATE ── */
   const [chatOpen, setChatOpen]             = useState(false)
   const [activeTab, setActiveTab]           = useState<TabId>("event-party")
-  const [activeCategory, setActiveCategory] = useState("All")
-  const [plan, setPlan]                     = useState<ShoppingPlan | null>(null)
-  const [activeSection, setActiveSection]   = useState(0)
   const [description, setDescription]       = useState("")
   const [col1Value, setCol1Value]           = useState("")
   const [col2Value, setCol2Value]           = useState("")
 
-  /* ── AWS STATE ── */
-  const [savedPlans, setSavedPlans]     = useState<any[]>([])
-  const [activePlanId, setActivePlanId] = useState<string | null>(null)
+  /* ── GENERATED PLAN STATE ── */
+  const [generatedPlan, setGeneratedPlan]   = useState<GeneratedPlan | null>(null)
+  const [activeSection, setActiveSection]   = useState(0)
+  const [generating, setGenerating]         = useState(false)
+  const [generateError, setGenerateError]   = useState<string | null>(null)
+  const [planSource, setPlanSource]         = useState<"cache" | "ai" | null>(null)
+
+  /* ── CHAT PLAN STATE (legacy fallback) ── */
+  const [chatPlan, setChatPlan]             = useState<ShoppingPlan | null>(null)
+
+  /* ── AWS SAVED PLANS ── */
+  const [savedPlans, setSavedPlans]         = useState<any[]>([])
+  const [activePlanId, setActivePlanId]     = useState<string | null>(null)
 
   const isDiy       = activeTab === "diy"
-  const catalogCats = isDiy ? DIY_CATS : EVENT_CATS
   const chips       = isDiy ? DIY_CHIPS : EVENT_CHIPS
   const tab         = TABS.find((t) => t.id === activeTab)!
+  const activePlan  = generatedPlan ?? null
 
   /* ─────────────────────────────
-     AWS: FETCH / SAVE / DELETE
+     AWS PLANS
   ───────────────────────────── */
 
   const fetchPlans = async () => {
@@ -150,11 +252,11 @@ export function Storefront({
   useEffect(() => { fetchPlans() }, [])
 
   const savePlanToAWS = async () => {
-    if (!plan) return
+    if (!generatedPlan) return
     await fetch("/api/save-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: plan.title, type: activeTab, prompt: description, plan }),
+      body: JSON.stringify({ title: generatedPlan.title, type: activeTab, prompt: description, plan: generatedPlan }),
     })
     fetchPlans()
   }
@@ -167,15 +269,15 @@ export function Storefront({
       body: JSON.stringify({ id }),
     })
     if (activePlanId === id) {
-      setPlan(null)
+      setGeneratedPlan(null)
       setActivePlanId(null)
       window.history.replaceState(null, "", "/")
     }
     fetchPlans()
   }
 
-  const loadPlan = (p: any) => {
-    setPlan(p.plan)
+  const loadSavedPlan = (p: any) => {
+    setGeneratedPlan(p.plan)
     setActiveSection(0)
     setChatOpen(false)
     const id = p.planId || p.createdAt
@@ -184,17 +286,50 @@ export function Storefront({
     window.history.replaceState(null, "", `?plan=${id}`)
   }
 
-  /* ── RESTORE FROM URL / LOCALSTORAGE ── */
   useEffect(() => {
     if (!savedPlans.length) return
     const params   = new URLSearchParams(window.location.search)
-    const planId   = params.get("plan")
-    const last     = localStorage.getItem("lastPlanId")
-    const targetId = planId || last
-    if (!targetId) return
-    const found = savedPlans.find((p) => (p.planId || p.createdAt) === targetId)
-    if (found) loadPlan(found)
+    const planId   = params.get("plan") || localStorage.getItem("lastPlanId")
+    if (!planId) return
+    const found = savedPlans.find((p) => (p.planId || p.createdAt) === planId)
+    if (found) loadSavedPlan(found)
   }, [savedPlans])
+
+  /* ─────────────────────────────
+     GENERATE PLAN
+  ───────────────────────────── */
+
+  const handleGenerate = async () => {
+    if (!description.trim()) return
+    setGenerating(true)
+    setGenerateError(null)
+    setGeneratedPlan(null)
+    setActiveSection(0)
+
+    try {
+      const res = await fetch("/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description,
+          type: activeTab,
+          guestCount: col1Value,
+          budget: col2Value,
+        }),
+      })
+
+      if (!res.ok) throw new Error("Failed to generate plan")
+
+      const data = await res.json()
+      setGeneratedPlan(data.plan)
+      setPlanSource(data.source)
+      setActiveSection(0)
+    } catch (err) {
+      setGenerateError("Something went wrong. Please try again.")
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   /* ─────────────────────────────
      HANDLERS
@@ -202,47 +337,34 @@ export function Storefront({
 
   function handleTabChange(id: TabId) {
     setActiveTab(id)
-    setActiveCategory("All")
     setDescription("")
     setCol1Value("")
     setCol2Value("")
-  }
-
-  function handlePlanReady(nextPlan: ShoppingPlan) {
-    setPlan(nextPlan)
-    setActiveSection(0)
-    setChatOpen(false)
+    setGeneratedPlan(null)
+    setGenerateError(null)
+    setPlanSource(null)
   }
 
   function clearPlan() {
-    setPlan(null)
+    setGeneratedPlan(null)
+    setChatPlan(null)
     setActiveSection(0)
-    setActiveCategory("All")
     setActivePlanId(null)
+    setPlanSource(null)
     localStorage.removeItem("lastPlanId")
     window.history.replaceState(null, "", "/")
   }
 
   function handleChipClick(chip: string) {
     setDescription(chip.replace(/[🎉🔧]/g, "").trim())
-    setChatOpen(true)
   }
 
   /* ─────────────────────────────
      DERIVED
   ───────────────────────────── */
 
-  const planTotal = useMemo(
-    () => (plan ? plan.sections.reduce((n, s) => n + s.products.length, 0) : 0),
-    [plan],
-  )
-
-  const displayProducts = useMemo(() => {
-    if (plan) return plan.sections?.[activeSection]?.products ?? []
-    return activeCategory === "All"
-      ? products
-      : products.filter((p) => p.category === activeCategory)
-  }, [plan, activeSection, products, activeCategory])
+  const currentSection = activePlan?.sections?.[activeSection]
+  const sectionProducts: AmazonProduct[] = currentSection?.products ?? []
 
   const deals = useMemo(
     () => products.filter((p) => p.originalPrice && p.originalPrice > p.price).length,
@@ -258,8 +380,8 @@ export function Storefront({
 
       {/* ── PREVIEW BANNER ── */}
       {preview && (
-        <div className="flex items-center justify-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-xs text-amber-800">
-          <Database className="size-3.5" aria-hidden="true" />
+        <div className="flex items-center justify-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800">
+          <Database className="size-3.5" />
           <span>
             Preview catalog. Connect &amp; seed DynamoDB (POST{" "}
             <code className="rounded bg-amber-100 px-1 py-0.5">/api/seed</code>) for the live catalog.
@@ -271,7 +393,7 @@ export function Storefront({
       <nav className="sticky top-0 z-30 bg-[#111] h-16 flex items-center justify-between px-8">
         <div className="flex items-center gap-3">
           <div className="bg-white rounded-md w-8 h-8 flex items-center justify-center flex-shrink-0">
-            <ShoppingBag className="size-5 text-[#111]" aria-hidden="true" />
+            <ShoppingBag className="size-5 text-[#111]" />
           </div>
           <div>
             <div className="text-white text-lg font-medium tracking-tight leading-none">
@@ -282,12 +404,11 @@ export function Storefront({
             </div>
           </div>
         </div>
-
         <button
           onClick={() => setChatOpen(true)}
           className="border border-[#555] text-[#6dcfa0] text-xs px-4 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-[#1a1a1a] transition-colors"
         >
-          <Bot className="size-3.5" aria-hidden="true" /> AI AGENT
+          <Bot className="size-3.5" /> AI AGENT
         </button>
       </nav>
 
@@ -304,7 +425,7 @@ export function Storefront({
           <p className="text-[#888] text-sm mt-1">{tab.sub}</p>
           <div className="w-9 h-[3px] bg-[#6dcfa0] rounded-full mt-3 mb-7" />
 
-          {/* Tabs */}
+          {/* Mode tabs */}
           <div className="flex gap-2 flex-wrap mb-7">
             {TABS.map((t) => (
               <button
@@ -322,7 +443,7 @@ export function Storefront({
             ))}
           </div>
 
-          {/* Main input */}
+          {/* Description input */}
           <label className="block text-[11px] tracking-widest uppercase text-[#999] font-medium mb-2">
             {isDiy ? "Describe your DIY task" : "Describe your event"}
           </label>
@@ -330,6 +451,7 @@ export function Storefront({
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
             placeholder={tab.placeholder}
             className="w-full border border-[#e0ddd5] rounded-lg px-4 py-3 text-sm bg-[#f9f7f3] text-[#222] outline-none focus:border-[#6dcfa0] transition-colors"
           />
@@ -374,14 +496,29 @@ export function Storefront({
 
           {/* CTA */}
           <button
-            onClick={() => setChatOpen(true)}
-            className="w-full bg-[#111] text-white rounded-xl py-4 text-sm tracking-widest uppercase font-medium hover:bg-[#222] transition-colors mt-7"
+            onClick={handleGenerate}
+            disabled={generating || !description.trim()}
+            className={cn(
+              "w-full rounded-xl py-4 text-sm tracking-widest uppercase font-medium transition-colors mt-7 flex items-center justify-center gap-2",
+              generating || !description.trim()
+                ? "bg-[#555] text-[#999] cursor-not-allowed"
+                : "bg-[#111] text-white hover:bg-[#222]",
+            )}
           >
-            ✦ {tab.cta}
+            {generating ? (
+              <><Loader2 className="size-4 animate-spin" /> Finding your supplies…</>
+            ) : (
+              <>✦ {tab.cta}</>
+            )}
           </button>
 
-          {/* Save to AWS — only shown when a plan exists */}
-          {plan && (
+          {/* Error */}
+          {generateError && (
+            <p className="text-xs text-red-500 mt-3 text-center">{generateError}</p>
+          )}
+
+          {/* Save to AWS */}
+          {generatedPlan && (
             <button
               onClick={savePlanToAWS}
               className="w-full mt-3 border border-[#6dcfa0] text-[#0b6b3a] bg-[#f0faf5] rounded-xl py-3 text-sm tracking-widest uppercase font-medium hover:bg-[#dff5eb] transition-colors"
@@ -391,140 +528,8 @@ export function Storefront({
           )}
         </div>
 
-        {/* ── MY SAVED PLANS ── */}
-        {savedPlans.length > 0 && (
-          <div className="mt-6 bg-white rounded-2xl border border-[#e0ddd5] px-6 py-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Database className="size-4 text-[#0b6b3a]" aria-hidden="true" />
-              <h3 className="text-sm font-medium text-[#111]">My Saved Plans</h3>
-            </div>
-            <div className="flex flex-col gap-2">
-              {savedPlans.map((p) => {
-                const id = p.planId || p.createdAt
-                return (
-                  <button
-                    key={id}
-                    onClick={() => loadPlan(p)}
-                    className={cn(
-                      "text-left border rounded-xl px-4 py-3 transition-colors w-full",
-                      activePlanId === id
-                        ? "bg-[#f0faf5] border-[#6dcfa0]"
-                        : "border-[#e0ddd5] hover:border-[#aaa] bg-[#f9f7f3]",
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-[#111]">{p.title}</div>
-                        <div className="text-xs text-[#888] mt-0.5 capitalize">
-                          {p.type?.replace("-", " ")}
-                        </div>
-                      </div>
-                      <span
-                        onClick={(e) => deletePlan(e, id)}
-                        className="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 rounded-md px-2 py-1 transition-colors"
-                      >
-                        Delete
-                      </span>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── CATALOG ── */}
-        <section className="mt-8" aria-labelledby="catalog-heading">
-          {plan ? (
-            <div className="flex flex-col gap-4 pb-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-[#f0faf5] text-[#0b6b3a]">
-                    <ListChecks className="size-4" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <h2 id="catalog-heading" className="text-lg font-medium text-[#111] leading-tight">
-                      {plan.title}
-                    </h2>
-                    <p className="text-sm text-[#888]">
-                      {plan.sections.length} section{plan.sections.length === 1 ? "" : "s"} · {planTotal} item
-                      {planTotal === 1 ? "" : "s"} planned by ShopSmart AI
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button onClick={() => setChatOpen(true)} size="sm" variant="outline">
-                    Refine plan
-                  </Button>
-                  <Button onClick={clearPlan} size="sm" variant="ghost">
-                    <X className="size-4" aria-hidden="true" /> Clear
-                  </Button>
-                </div>
-              </div>
-
-              {/* Plan section tabs */}
-              <div className="flex flex-wrap gap-2">
-                {plan.sections.map((section, i) => (
-                  <button
-                    key={section.title}
-                    onClick={() => setActiveSection(i)}
-                    className={cn(
-                      "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-                      activeSection === i
-                        ? "bg-[#111] text-white border-[#111]"
-                        : "bg-white text-[#555] border-[#ddd] hover:border-[#999]",
-                    )}
-                  >
-                    {section.title}
-                    <span className={cn("ml-1.5 text-xs", activeSection === i ? "text-white/70" : "text-[#aaa]")}>
-                      {section.products.length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4 pb-4">
-              <div className="flex items-center justify-between">
-                <h2 id="catalog-heading" className="text-base font-medium text-[#111]">
-                  Browse the catalog
-                </h2>
-                <span className="text-xs bg-[#f0faf5] text-[#0b6b3a] border border-[#b5e4cc] px-3 py-1 rounded-full">
-                  ⚡ {deals} live deals today
-                </span>
-              </div>
-
-              {/* Category pills */}
-              <div className="flex flex-wrap gap-2">
-                {catalogCats.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={cn(
-                      "rounded-full border px-4 py-1.5 text-xs font-medium transition-colors",
-                      activeCategory === cat
-                        ? "bg-[#111] text-white border-[#111]"
-                        : "bg-white text-[#555] border-[#ddd] hover:border-[#999]",
-                    )}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="pt-4">
-            {displayProducts.length ? (
-              <ProductGrid className="lg:grid-cols-4" products={displayProducts} />
-            ) : (
-              <p className="py-12 text-center text-[#aaa] text-sm">No products in this list yet.</p>
-            )}
-          </div>
-        </section>
-
         {/* ── QUICK START CHIPS ── */}
-        {!plan && (
+        {!generatedPlan && (
           <div className="mt-6 bg-white rounded-2xl border border-[#e0ddd5] px-6 py-5">
             <p className="text-xs text-[#999] uppercase tracking-widest mb-3">Quick start</p>
             <div className="flex flex-wrap gap-2">
@@ -545,6 +550,130 @@ export function Storefront({
             </div>
           </div>
         )}
+
+        {/* ── GENERATED PLAN RESULTS ── */}
+        {generatedPlan && (
+          <section className="mt-8" aria-labelledby="catalog-heading">
+
+            {/* Plan header */}
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-[#f0faf5] text-[#0b6b3a]">
+                  <ListChecks className="size-4" />
+                </span>
+                <div>
+                  <h2 id="catalog-heading" className="text-lg font-medium text-[#111] leading-tight">
+                    {generatedPlan.title}
+                  </h2>
+                  <p className="text-xs text-[#888] mt-0.5 flex items-center gap-1.5">
+                    {generatedPlan.sections.length} categories ·{" "}
+                    {generatedPlan.sections.reduce((n, s) => n + s.products.length, 0)} items
+                    {planSource === "cache" && (
+                      <span className="bg-[#f0faf5] text-[#0b6b3a] border border-[#b5e4cc] text-[10px] px-2 py-0.5 rounded-full">
+                        ✓ From cache
+                      </span>
+                    )}
+                    {planSource === "ai" && (
+                      <span className="bg-[#f0f0ff] text-[#3333aa] border border-[#c0c0f0] text-[10px] px-2 py-0.5 rounded-full">
+                        ✦ AI generated
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button onClick={() => setChatOpen(true)} size="sm" variant="outline">
+                  Refine with AI
+                </Button>
+                <Button onClick={clearPlan} size="sm" variant="ghost">
+                  <X className="size-4" /> Clear
+                </Button>
+              </div>
+            </div>
+
+            {/* Section tabs */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {generatedPlan.sections.map((section, i) => (
+                <button
+                  key={section.title}
+                  onClick={() => setActiveSection(i)}
+                  className={cn(
+                    "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                    activeSection === i
+                      ? "bg-[#111] text-white border-[#111]"
+                      : "bg-white text-[#555] border-[#ddd] hover:border-[#999]",
+                  )}
+                >
+                  {section.title}
+                  <span className={cn("ml-1.5 text-xs", activeSection === i ? "text-white/70" : "text-[#aaa]")}>
+                    {section.products.length}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Section heading */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-medium text-[#111]">
+                {currentSection?.title}
+              </h3>
+              <span className="text-xs text-[#888]">
+                Showing {sectionProducts.length} items from Amazon
+              </span>
+            </div>
+
+            {/* Amazon product grid */}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {sectionProducts.map((product) => (
+                <AmazonCard key={product.asin} product={product} />
+              ))}
+            </div>
+
+          </section>
+        )}
+
+        {/* ── MY SAVED PLANS ── */}
+        {savedPlans.length > 0 && (
+          <div className="mt-8 bg-white rounded-2xl border border-[#e0ddd5] px-6 py-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Database className="size-4 text-[#0b6b3a]" />
+              <h3 className="text-sm font-medium text-[#111]">My Saved Plans</h3>
+            </div>
+            <div className="flex flex-col gap-2">
+              {savedPlans.map((p) => {
+                const id = p.planId || p.createdAt
+                return (
+                  <button
+                    key={id}
+                    onClick={() => loadSavedPlan(p)}
+                    className={cn(
+                      "text-left border rounded-xl px-4 py-3 transition-colors w-full",
+                      activePlanId === id
+                        ? "bg-[#f0faf5] border-[#6dcfa0]"
+                        : "border-[#e0ddd5] hover:border-[#aaa] bg-[#f9f7f3]",
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium text-[#111]">{p.title}</div>
+                        <div className="text-xs text-[#888] mt-0.5 capitalize">
+                          {p.type?.replace(/-/g, " ")}
+                        </div>
+                      </div>
+                      <span
+                        onClick={(e) => deletePlan(e, id)}
+                        className="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 rounded-md px-2 py-1 transition-colors"
+                      >
+                        Delete
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* ── CHAT OVERLAY ── */}
@@ -563,10 +692,9 @@ export function Storefront({
           chatOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
-        {/* Chat header */}
         <div className="flex items-center justify-between border-b border-[#e0ddd5] px-5 py-4">
           <div className="flex items-center gap-2">
-            <Bot className="size-5 text-[#6dcfa0]" aria-hidden="true" />
+            <Bot className="size-5 text-[#6dcfa0]" />
             <span className="font-medium text-[#111]">ShopSmart Assistant</span>
             <span
               className={cn(
@@ -577,8 +705,8 @@ export function Storefront({
               )}
             >
               {isDiy
-                ? <><Wrench className="size-2.5" aria-hidden="true" /> DIY mode</>
-                : <><PartyPopper className="size-2.5" aria-hidden="true" /> Event mode</>
+                ? <><Wrench className="size-2.5" /> DIY mode</>
+                : <><PartyPopper className="size-2.5" /> Event mode</>
               }
             </span>
           </div>
@@ -590,9 +718,13 @@ export function Storefront({
             <X className="size-5" />
           </button>
         </div>
-
         <div className="min-h-0 flex-1">
-          <ChatAssistant onPlanReady={handlePlanReady} />
+          <ChatAssistant
+            onPlanReady={(p) => {
+              setChatPlan(p)
+              setChatOpen(false)
+            }}
+          />
         </div>
       </aside>
     </div>
