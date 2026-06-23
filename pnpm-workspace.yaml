@@ -1,2 +1,2 @@
-allowBuilds:
-  sharp: false
+overrides:
+  hono: "4.12.25"
