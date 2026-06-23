@@ -241,7 +241,7 @@ export function Storefront({
 
   const fetchPlans = async () => {
     try {
-      const res  = await fetch("/api/plans")
+      const res  = await fetch("/api/generate-plan")
       const data = await res.json()
       setSavedPlans(data || [])
     } catch (e) {
