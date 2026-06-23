@@ -1,0 +1,35 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+? Verifying lockfile against supply-chain policies (807 entries)...
+
+   ╭─────────────────────────────────────────╮
+   │                                         │
+   │   Update available! 11.6.0 → 11.8.0.    │
+   │   Changelog: https://pnpm.io/v/11.8.0   │
+   │    To update, run: pnpm add -g pnpm     │
+   │                                         │
+   ╰─────────────────────────────────────────╯
+
+✗ Lockfile failed supply-chain policy check (807 entries in 5.1s)
+[ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION] 6 lockfile entries failed verification:
+  @smithy/core@3.26.0 was published at 2026-06-22T17:38:19.000Z, within the minimumReleaseAge cutoff (2026-06-22T02:57:30.828Z)
+  @smithy/credential-provider-imds@4.4.2 was published at 2026-06-22T17:38:18.000Z, within the minimumReleaseAge cutoff (2026-06-22T02:57:30.828Z)
+  @smithy/fetch-http-handler@5.5.2 was published at 2026-06-22T17:38:23.000Z, within the minimumReleaseAge cutoff (2026-06-22T02:57:30.828Z)
+  @smithy/node-http-handler@4.8.2 was published at 2026-06-22T17:38:27.000Z, within the minimumReleaseAge cutoff (2026-06-22T02:57:30.828Z)
+  @smithy/signature-v4@5.5.2 was published at 2026-06-22T17:38:31.000Z, within the minimumReleaseAge cutoff (2026-06-22T02:57:30.828Z)
+  swr@2.4.2 was published at 2026-06-22T17:43:54.000Z, within the minimumReleaseAge cutoff (2026-06-22T02:57:30.828Z)
+
+The lockfile contains entries that the active policies reject. This can mean the lockfile is stale, or that someone committed a lockfile that bypassed the policy locally — inspect recent changes to pnpm-lock.yaml before trusting it. If the changes look expected, run "pnpm clean --lockfile" and then "pnpm install" to rebuild from a fresh resolution. Alternatively, relax the policy that flagged them.
+[ERROR] Command failed with exit code 1: "C:\Program Files\nodejs\node.exe" "C:\Users\ramne\AppData\Roaming\npm\node_modules\pnpm\bin\pnpm.mjs" install
+
+pnpm: Command failed with exit code 1: "C:\Program Files\nodejs\node.exe" "C:\Users\ramne\AppData\Roaming\npm\node_modules\pnpm\bin\pnpm.mjs" install
+    at getFinalError (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:34053:14)
+    at makeError (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:36360:21)
+    at getSyncResult (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:38204:10)
+    at spawnSubprocessSync (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:38164:14)
+    at execaCoreSync (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:38094:23)
+    at callBoundExeca (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:40622:23)
+    at boundExeca (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:40599:49)
+    at sync (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:40758:10)
+    at runPnpmCli (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:244491:5)
+    at runDepsStatusCheck (file:///C:/Users/ramne/AppData/Roaming/npm/node_modules/pnpm/dist/pnpm.mjs:246225:7)
