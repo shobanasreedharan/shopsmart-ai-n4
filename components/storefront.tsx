@@ -63,7 +63,7 @@ const TABS: {
     id: "event-party",
     label: "Event Planning",
     icon: <PartyPopper className="size-4" />,
-    title: "Plan Your Event Supplies",
+    title: "Plan Your Event or DIY Supplies",
     sub: "AI builds your complete event shopping list",
     placeholder: "e.g. Kids birthday party for 20 guests",
     cta: "GENERATE EVENT PLAN",
