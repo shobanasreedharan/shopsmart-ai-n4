@@ -1,9 +1,9 @@
 import { generateText } from "ai"
 
-// ── In-memory cache (survives warm Lambda invocations) ────────────────────────
+// ── In-memory cache ───────────────────────────────────────────────────────────
 const memoryCache = new Map<string, any>()
 
-// ── DynamoDB (optional — only used if AWS credentials are present) ────────────
+// ── DynamoDB (optional) ───────────────────────────────────────────────────────
 let dynamo: any = null
 
 async function getDynamo() {
@@ -12,17 +12,15 @@ async function getDynamo() {
     process.env.AWS_ACCESS_KEY_ID &&
     process.env.AWS_SECRET_ACCESS_KEY &&
     process.env.DYNAMODB_TABLE
-
   if (!hasCredentials) return null
-
   try {
-    const { DynamoDBClient } = await import("@aws-sdk/client-dynamodb")
+    const { DynamoDBClient }         = await import("@aws-sdk/client-dynamodb")
     const { DynamoDBDocumentClient } = await import("@aws-sdk/lib-dynamodb")
     dynamo = DynamoDBDocumentClient.from(
       new DynamoDBClient({
         region: process.env.AWS_REGION ?? "us-east-2",
         credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+          accessKeyId:     process.env.AWS_ACCESS_KEY_ID!,
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
         },
       }),
@@ -38,61 +36,124 @@ function planKey(type: string, description: string) {
   return `PLAN#${type}#${slug}`
 }
 
-// ── Mock Amazon products ──────────────────────────────────────────────────────
-function mockAmazonProducts(sectionTitle: string, count = 6) {
-  const catalog: Record<string, { brands: string[]; names: string[] }> = {
-    "Decorations":        { brands: ["FestaCo","GlowNest","PartyPop","DecoLux"],        names: ["Balloon Arch Kit","Foil Banner Set","LED String Lights","Paper Lanterns","Confetti Cannon","Centerpiece Kit"] },
-    "Food & Supplies":    { brands: ["ServeWell","TableTop","FreshFete","EasyEats"],     names: ["Party Plates Set (24)","Disposable Cups 50pk","Cutlery Set 96pc","Paper Napkins 200ct","Table Cover 4-Pack","Serving Trays Set"] },
-    "Party Favors":       { brands: ["JoyBox","FavorBox","GiftGlow","TreatCo"],         names: ["Goodie Bags 24pk","Bubble Wand Pack","Mini Toy Assortment","Sticker Sheet Bulk","Candy Favor Boxes","Thank-You Tags"] },
-    "Games & Activities": { brands: ["FiestaPlay","FunZone","GameTime","PlayPro"],      names: ["Pull-String Piñata","Ring Toss Game","Face Paint Kit","Bean Bag Toss","Musical Chairs Set","Scavenger Hunt Kit"] },
-    "Movie Night":        { brands: ["CozyReel","ScreenNest","NightIn","CinemaBox"],    names: ["Tabletop Popcorn Maker","Projector Screen 100\"","Plush Throw Blankets","Snack Variety Box","LED Floor Cushions","Mini Projector"] },
-    "Plumbing":           { brands: ["FixIt","PipePro","FlowRight","DrainMate"],        names: ["Drain Snake 25ft","Pipe Repair Tape 3pk","Toilet Repair Kit","Plumber's Putty Set","Compression Fittings","Pipe Cutter Tool"] },
-    "Electrical":         { brands: ["SafeElec","WireWise","VoltPro","CircuitCo"],      names: ["Digital Multimeter","Outlet Tester","Wire Stripper Kit","Electrical Tape 10pk","Junction Box Set","Cable Staples 100pk"] },
-    "Painting":           { brands: ["WallCo","BrushPro","ColorRight","PaintMate"],     names: ["Paint Roller Kit 9pc","Painter's Tape 3pk","Wall Patch Kit","Canvas Drop Cloth","Angled Trim Brush","Paint Tray Liners 10pk"] },
-    "Carpentry":          { brands: ["BuildRight","WoodPro","NailIt","CraftBuild"],     names: ["Drill Bit Set 50pc","Framing Hammer 20oz","Wood Glue & Clamp Kit","Sandpaper Set 40pc","Speed Square","Pocket Screw Kit"] },
-    "Appliances":         { brands: ["AppliancePro","FixApply","HomeRepair","TechFix"], names: ["Washing Machine Repair Kit","Dryer Vent Brush Kit","Fridge Door Gasket","Dishwasher Tablets 6pk","Appliance Touch-Up Paint","Motor Capacitor Kit"] },
+// ── Google Image search ───────────────────────────────────────────────────────
+async function fetchGoogleImage(productName: string): Promise<string | null> {
+  const apiKey  = process.env.GOOGLE_API_KEY
+  const cx      = process.env.GOOGLE_SEARCH_ENGINE_ID
+
+  if (!apiKey || !cx) return null
+
+  try {
+    const query = encodeURIComponent(`${productName} product`)
+    const url   = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${query}&searchType=image&num=1&safe=active&imgSize=medium`
+
+    const res  = await fetch(url)
+    const data = await res.json()
+
+    if (data.items && data.items.length > 0) {
+      return data.items[0].link ?? null
+    }
+  } catch (err) {
+    console.error(`Image fetch failed for "${productName}":`, err)
   }
 
-  const entry     = catalog[sectionTitle] ?? { brands: ["BrandCo","ProMake"], names: ["Essential Kit","Pro Set","Starter Pack","Deluxe Bundle","Value Pack","Complete Set"] }
-  const brandList = entry.brands
-  const nameList  = entry.names
-
-  return Array.from({ length: count }, (_, i) => ({
-    asin:          `B0${String(Math.floor(Math.random() * 9000000) + 1000000)}`,
-    name:          nameList[i % nameList.length],
-    brand:         brandList[i % brandList.length],
-    price:         parseFloat((Math.random() * 45 + 5).toFixed(2)),
-    originalPrice: Math.random() > 0.4 ? parseFloat((Math.random() * 20 + 20).toFixed(2)) : null,
-    rating:        parseFloat((Math.random() * 1.5 + 3.5).toFixed(1)),
-    reviewCount:   Math.floor(Math.random() * 8000 + 200),
-    imageUrl:      `/products/${sectionTitle.toLowerCase().replace(/[^a-z]/g, "-")}-${i + 1}.png`,
-    amazonUrl:     `https://www.amazon.com/s?k=${encodeURIComponent(nameList[i % nameList.length])}`,
-    inStock:       Math.random() > 0.1,
-    badge:         Math.random() > 0.6 ? "Best Seller" : Math.random() > 0.5 ? "Amazon's Choice" : null,
-  }))
+  return null
 }
 
-// ── AI section generation ─────────────────────────────────────────────────────
-async function generateSections(description: string, type: string, guestCount: string, budget: string): Promise<string[]> {
-  const isDiy = type === "diy"
+// ── AI: generate full themed plan ─────────────────────────────────────────────
+async function generatePlanFromAI(
+  description: string,
+  type: string,
+  guestCount: string,
+  budget: string,
+) {
+  const prompt = `
+You are an event planning assistant. Given the event description, generate a themed shopping plan.
+
+Event: "${description}"
+Guests: ${guestCount || "unspecified"}
+Budget: ${budget || "unspecified"}
+
+Return ONLY a valid JSON object (no markdown, no explanation) in this exact format:
+{
+  "title": "short event title",
+  "sections": [
+    {
+      "title": "Section Name",
+      "products": [
+        { "name": "specific themed product name" },
+        { "name": "specific themed product name" },
+        { "name": "specific themed product name" },
+        { "name": "specific themed product name" },
+        { "name": "specific themed product name" },
+        { "name": "specific themed product name" }
+      ]
+    }
+  ]
+}
+
+Rules:
+- 3 to 5 sections total
+- 6 products per section
+- Product names MUST be specific to the theme (e.g. for superhero: "Spider-Man Balloon Arch Kit", "Avengers Birthday Banner", "Superman Cape Party Favors")
+- Section titles should match the event type (Decorations, Food & Supplies, Party Favors, Games & Activities, etc.)
+- DO NOT include brands, prices, ratings, or descriptions
+`
 
   try {
     const { text } = await generateText({
       model: "openai/gpt-4o-mini" as any,
-      system: isDiy
-        ? `Return ONLY a JSON array of 3-5 short DIY section names for tools/supplies needed. No explanation. Example: ["Diagnostic Tools","Replacement Parts","Fasteners & Seals"]`
-        : `Return ONLY a JSON array of 3-5 short event section names for supplies needed. No explanation. Example: ["Decorations","Food & Supplies","Party Favors","Games & Activities"]`,
-      messages: [{ role: "user", content: `Task: ${description}. Guests: ${guestCount || "unspecified"}. Budget: ${budget || "unspecified"}.` }],
+      messages: [{ role: "user", content: prompt }],
     })
-    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim())
-    if (Array.isArray(parsed) && parsed.every((s) => typeof s === "string")) return parsed.slice(0, 5)
+
+    const clean  = text.replace(/```json|```/g, "").trim()
+    const parsed = JSON.parse(clean)
+
+    if (parsed.sections && Array.isArray(parsed.sections)) {
+      // Fetch Google images in parallel for all products
+      const sectionsWithImages = await Promise.all(
+        parsed.sections.map(async (s: any) => {
+          const productsWithImages = await Promise.all(
+            (s.products ?? []).map(async (p: any) => {
+              const imageUrl = await fetchGoogleImage(p.name)
+              return {
+                asin:      `B0${String(Math.floor(Math.random() * 9000000) + 1000000)}`,
+                name:      p.name,
+                amazonUrl: `https://www.amazon.com/s?k=${encodeURIComponent(p.name)}`,
+                imageUrl:  imageUrl ?? null,
+                inStock:   true,
+              }
+            }),
+          )
+          return { title: s.title, products: productsWithImages }
+        }),
+      )
+
+      return { title: parsed.title ?? description, sections: sectionsWithImages }
+    }
   } catch (err) {
-    console.error("AI generation failed, using fallback:", err)
+    console.error("AI plan generation failed:", err)
   }
 
-  return isDiy
-    ? ["Tools & Equipment", "Replacement Parts", "Safety Supplies"]
-    : ["Decorations", "Food & Supplies", "Party Favors", "Games & Activities"]
+  // Fallback
+  return {
+    title: description,
+    sections: [
+      {
+        title: "Decorations",
+        products: await Promise.all(
+          ["Balloon Arch Kit", "Birthday Banner", "Table Centerpiece", "String Lights", "Confetti Cannon", "Hanging Decorations"]
+            .map(async (name) => ({
+              asin: `B0${String(Math.floor(Math.random() * 9000000) + 1000000)}`,
+              name,
+              amazonUrl: `https://www.amazon.com/s?k=${encodeURIComponent(name)}`,
+              imageUrl:  await fetchGoogleImage(name),
+              inStock:   true,
+            })),
+        ),
+      },
+    ],
+  }
 }
 
 // ── HANDLER ───────────────────────────────────────────────────────────────────
@@ -106,13 +167,13 @@ export async function POST(req: Request) {
 
     const cacheKey = planKey(type ?? "event-party", description)
 
-    // 1. Check memory cache
+    // 1. Memory cache
     if (memoryCache.has(cacheKey)) {
       console.log("Memory cache hit:", cacheKey)
       return Response.json({ plan: memoryCache.get(cacheKey), source: "cache" })
     }
 
-    // 2. Check DynamoDB (if credentials available)
+    // 2. DynamoDB cache
     const db = await getDynamo()
     if (db) {
       try {
@@ -130,19 +191,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Generate via AI
-    const sections = await generateSections(description, type ?? "event-party", guestCount ?? "", budget ?? "")
-
-    const plan = {
-      title: description,
-      type:  type ?? "event-party",
-      sections: sections.map((title) => ({ title, products: mockAmazonProducts(title) })),
-    }
+    // 3. Generate via AI + Google Images
+    const plan = await generatePlanFromAI(description, type ?? "event-party", guestCount ?? "", budget ?? "")
 
     // 4. Cache in memory
     memoryCache.set(cacheKey, plan)
 
-    // 5. Save to DynamoDB (non-blocking, if available)
+    // 5. Save to DynamoDB (non-blocking)
     if (db) {
       try {
         const { PutCommand } = await import("@aws-sdk/lib-dynamodb")
