@@ -26,9 +26,7 @@ async function getDynamo() {
       }),
     )
     return dynamo
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
 function planKey(type: string, description: string) {
@@ -36,28 +34,22 @@ function planKey(type: string, description: string) {
   return `PLAN#${type}#${slug}`
 }
 
-// ── Google Image search ───────────────────────────────────────────────────────
-async function fetchGoogleImage(productName: string): Promise<string | null> {
-  const apiKey  = process.env.GOOGLE_API_KEY
-  const cx      = process.env.GOOGLE_SEARCH_ENGINE_ID
-
-  if (!apiKey || !cx) return null
+// ── Unsplash image fetch ──────────────────────────────────────────────────────
+async function fetchUnsplashImage(query: string): Promise<string | null> {
+  const accessKey = process.env.UNSPLASH_ACCESS_KEY
+  if (!accessKey) return null
 
   try {
-    const query = encodeURIComponent(`${productName} product`)
-    const url   = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${query}&searchType=image&num=1&safe=active&imgSize=medium`
-
-    const res  = await fetch(url)
+    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=squarish`
+    const res  = await fetch(url, {
+      headers: { Authorization: `Client-ID ${accessKey}` },
+    })
     const data = await res.json()
-
-    if (data.items && data.items.length > 0) {
-      return data.items[0].link ?? null
-    }
+    return data.results?.[0]?.urls?.small ?? null
   } catch (err) {
-    console.error(`Image fetch failed for "${productName}":`, err)
+    console.error(`Unsplash fetch failed for "${query}":`, err)
+    return null
   }
-
-  return null
 }
 
 // ── AI: generate full themed plan ─────────────────────────────────────────────
@@ -95,7 +87,7 @@ Return ONLY a valid JSON object (no markdown, no explanation) in this exact form
 Rules:
 - 3 to 5 sections total
 - 6 products per section
-- Product names MUST be specific to the theme (e.g. for superhero: "Spider-Man Balloon Arch Kit", "Avengers Birthday Banner", "Superman Cape Party Favors")
+- Product names MUST be specific to the theme (e.g. for superhero: "Spider-Man Balloon Arch Kit", "Avengers Birthday Banner")
 - Section titles should match the event type (Decorations, Food & Supplies, Party Favors, Games & Activities, etc.)
 - DO NOT include brands, prices, ratings, or descriptions
 `
@@ -110,12 +102,13 @@ Rules:
     const parsed = JSON.parse(clean)
 
     if (parsed.sections && Array.isArray(parsed.sections)) {
-      // Fetch Google images in parallel for all products
+      // Fetch Unsplash images in parallel — use section title for better images
       const sectionsWithImages = await Promise.all(
         parsed.sections.map(async (s: any) => {
           const productsWithImages = await Promise.all(
             (s.products ?? []).map(async (p: any) => {
-              const imageUrl = await fetchGoogleImage(p.name)
+              // Search with product name + section context for better results
+              const imageUrl = await fetchUnsplashImage(`${p.name} ${s.title}`)
               return {
                 asin:      `B0${String(Math.floor(Math.random() * 9000000) + 1000000)}`,
                 name:      p.name,
@@ -144,10 +137,10 @@ Rules:
         products: await Promise.all(
           ["Balloon Arch Kit", "Birthday Banner", "Table Centerpiece", "String Lights", "Confetti Cannon", "Hanging Decorations"]
             .map(async (name) => ({
-              asin: `B0${String(Math.floor(Math.random() * 9000000) + 1000000)}`,
+              asin:      `B0${String(Math.floor(Math.random() * 9000000) + 1000000)}`,
               name,
               amazonUrl: `https://www.amazon.com/s?k=${encodeURIComponent(name)}`,
-              imageUrl:  await fetchGoogleImage(name),
+              imageUrl:  await fetchUnsplashImage(name),
               inStock:   true,
             })),
         ),
@@ -169,7 +162,6 @@ export async function POST(req: Request) {
 
     // 1. Memory cache
     if (memoryCache.has(cacheKey)) {
-      console.log("Memory cache hit:", cacheKey)
       return Response.json({ plan: memoryCache.get(cacheKey), source: "cache" })
     }
 
@@ -182,7 +174,6 @@ export async function POST(req: Request) {
           new GetCommand({ TableName: process.env.DYNAMODB_TABLE, Key: { category: "PLAN", productId: cacheKey } }),
         )
         if (existing.Item?.plan) {
-          console.log("DynamoDB cache hit:", cacheKey)
           memoryCache.set(cacheKey, existing.Item.plan)
           return Response.json({ plan: existing.Item.plan, source: "cache" })
         }
@@ -191,7 +182,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Generate via AI + Google Images
+    // 3. Generate via AI + Unsplash images
     const plan = await generatePlanFromAI(description, type ?? "event-party", guestCount ?? "", budget ?? "")
 
     // 4. Cache in memory
@@ -212,7 +203,7 @@ export async function POST(req: Request) {
           }),
         )
       } catch (err) {
-        console.error("DynamoDB write error (non-fatal):", err)
+        console.error("DynamoDB write error:", err)
       }
     }
 
