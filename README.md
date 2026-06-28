@@ -1,33 +1,44 @@
-# shopsmart-ai-n4
+# ShopSmart AI
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+ShopSmart AI is a conversational AI shopping assistant that helps users plan events and DIY projects by recommending the right products instantly.
 
-## Built with v0
+## Live Demo
+🔗 [https://shopsmart-ai-build.vercel.app](https://shopsmart-ai-build.vercel.app)
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+## Built With
+- **Next.js** — Frontend framework
+- **AWS DynamoDB** — Product catalog database
+- **Vercel** — Deployment and AI Gateway
+- **Vercel AI SDK** — Streaming chat with tool calls
+- **GPT-4o-mini** — AI recommendations
+- **TypeScript / Tailwind CSS / pnpm**
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_OgYreWQ9vfE5U2l11PxYTT43BF3g)
+## Features
+- Event planning assistant (birthday parties, BBQs, movie nights)
+- DIY project assistant (plumbing, electrical, painting, carpentry)
+- AI-powered product recommendations from real catalog
+- DynamoDB-first caching — faster responses over time
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
+VERCEL_OIDC_TOKEN=
+DYNAMODB_TABLE_NAME=
+AWS_REGION=
+AWS_ROLE_ARN=
+AWS_RESOURCE_ARN=
+AWS_ACCOUNT_ID=
+AI_GATEWAY_API_KEY=
 
-## Learn More
+## Hackathon Submission
+Built for the [H01 AWS + Vercel Hackathon](https://h01.devpost.com) — June 2026.
 
-To learn more, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+## License
+See [LICENSE](./LICENSE)
