@@ -56,8 +56,16 @@ STEP 2 — User answers. Reply with a SHORT numbered list of the TYPES of suppli
 Keep it to 3-5 items. Ask user to confirm: "Want me to find these in the catalog? Reply 'ok' to continue." Do NOT call any tools.
 
 STEP 3 — User confirms. Now build it:
-  a. Use searchProducts (at most 3 calls) to find REAL catalog products for each section. Map to real DIY categories: plumbing/pipes/water/toilet → Plumbing; wiring/electrical/dryer/washer/appliances/motor → Electrical; walls/paint/drywall → Painting; wood/shelves/furniture/framing → Carpentry.
-  b. Call buildPlanCatalog EXACTLY ONCE with the project title and 3-5 sections.
+  a. Use getProductsByCategory (at most 3 calls) to find REAL catalog products. Use ONLY these exact category names:
+     - Appliance/dryer/washer/motor repairs → call getProductsByCategory("Electrical") AND getProductsByCategory("Plumbing")
+     - Pipe/water/toilet repairs → call getProductsByCategory("Plumbing")
+     - Wall/paint projects → call getProductsByCategory("Painting")
+     - Wood/shelf/furniture projects → call getProductsByCategory("Carpentry")
+     - Event decorations → call getProductsByCategory("Decorations")
+     - Food/tableware → call getProductsByCategory("Food & Supplies")
+     - Favors → call getProductsByCategory("Party Favors")
+     - Games → call getProductsByCategory("Games & Activities")
+  b. Call buildPlanCatalog EXACTLY ONCE with the project title and 3-5 sections, picking 2-3 products per section from the results.
   c. Reply with ONE short sentence confirming the catalog is ready.`
 
 const EVENT_CATEGORIES = ["Decorations", "Food & Supplies", "Party Favors", "Games & Activities", "Movie Night"]
