@@ -561,8 +561,24 @@ export function Storefront({
             <X className="size-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1">
-          <ChatAssistant onPlanReady={() => setChatOpen(false)} />
+        <div className="min-h-0 flex-1" style={{ display: chatOpen ? 'flex' : 'none', flexDirection: 'column' }}>
+          <ChatAssistant onPlanReady={(plan) => {
+            setGeneratedPlan({
+              title: plan.title,
+              type: "diy",
+              sections: plan.sections.map(s => ({
+                title: s.title,
+                products: s.products.map(p => ({
+                  asin: p.productId,
+                  name: p.name,
+                  amazonUrl: `https://www.amazon.com/s?k=${encodeURIComponent(p.name)}`,
+                  imageUrl: p.imageUrl ?? null,
+                  inStock: p.inStock ?? true,
+                }))
+              }))
+            })
+            setChatOpen(false)
+          }} />
         </div>
       </aside>
     </div>
